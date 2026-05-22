@@ -116,7 +116,7 @@ check_repo_exists() {
         log_info "仓库已存在"
         return 0
     else
-        log_warn "仓库不存在"
+        log_warn "仓库不存在（精确匹配）"
         return 1
     fi
 }
@@ -145,6 +145,18 @@ create_repo() {
     if [ "$response" == "201" ] || [ "$response" == "200" ]; then
         log_info "仓库创建成功"
         return 0
+    elif [ "$response" == "422" ]; then
+        # 检查是否是仓库已存在的错误
+        if grep -q "已存在同地址仓库" /tmp/gitee_response.json 2>/dev/null; then
+            log_warn "仓库已存在（忽略大小写），继续同步"
+            return 0
+        else
+            log_error "仓库创建失败，HTTP 状态码: $response"
+            if [ -f /tmp/gitee_response.json ]; then
+                log_error "响应内容: $(cat /tmp/gitee_response.json)"
+            fi
+            return 1
+        fi
     else
         log_error "仓库创建失败，HTTP 状态码: $response"
         if [ -f /tmp/gitee_response.json ]; then
