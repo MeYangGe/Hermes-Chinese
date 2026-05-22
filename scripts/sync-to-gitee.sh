@@ -35,6 +35,16 @@ check_env_vars() {
         exit 1
     fi
     
+    if [ -z "$GITHUB_TOKEN" ]; then
+        log_error "GITHUB_TOKEN 环境变量未设置"
+        exit 1
+    fi
+    
+    if [ -z "$RUN_NUMBER" ]; then
+        log_error "RUN_NUMBER 环境变量未设置"
+        exit 1
+    fi
+    
     log_info "环境变量检查通过"
 }
 
@@ -137,6 +147,74 @@ sync_code() {
     log_info "代码同步完成！"
 }
 
+# 更新 Pull Log
+update_pull_log() {
+    log_info "更新 Pull Log..."
+    
+    local CURRENT_DATE=$(date '+%Y-%m-%d %H:%M:%S')
+    
+    # 配置 git
+    git config user.name "github-actions[bot]"
+    git config user.email "github-actions[bot]@users.noreply.github.com"
+    
+    # 读取现有日志
+    if [ -f UPDATE_LOG.md ]; then
+        # 在表格末尾添加新行
+        sed -i "3a| ${CURRENT_DATE} | 同步 #${RUN_NUMBER} | 自动同步 hermes-agent 到 Gitee |" UPDATE_LOG.md
+    else
+        # 创建新日志文件
+        echo "# 拉取同步日志" > UPDATE_LOG.md
+        echo "" >> UPDATE_LOG.md
+        echo "| Date | Version | Changes |" >> UPDATE_LOG.md
+        echo "|------|---------|---------|" >> UPDATE_LOG.md
+        echo "| ${CURRENT_DATE} | 同步 #${RUN_NUMBER} | 自动同步 hermes-agent 到 Gitee |" >> UPDATE_LOG.md
+    fi
+    
+    # 提交日志更新
+    git add UPDATE_LOG.md
+    git commit -m "docs: 更新拉取日志 - 同步 #${RUN_NUMBER}" || echo "无更新"
+    git push
+    
+    log_info "Pull Log 更新完成！"
+}
+
+# 创建或更新 Release
+create_release() {
+    log_info "创建 Release..."
+    
+    # 创建一个简单的临时文件用于 JSON payload
+    cat > /tmp/release_payload.json << EOF
+{
+    "tag_name": "sync-${RUN_NUMBER}",
+    "name": "hermes-agent 镜像同步",
+    "body": "## Hermes Agent 自动同步\n\n自动从 GitHub (NousResearch/hermes-agent) 同步到 Gitee 镜像仓库。\n\n**同步时间**: $(date -u +"%Y-%m-%dT%H:%M:%SZ")\n**同步方式**: 完整镜像同步（包含所有分支和标签）\n\n### 配置说明\n- 同步频率：每6小时自动同步\n- 支持手动触发：通过 GitHub Actions 页面手动运行\n- 镜像仓库：Gitee 对应仓库",
+    "draft": false,
+    "prerelease": false
+}
+EOF
+    
+    # 使用 GitHub API 创建 Release
+    local response=$(curl -s -w "%{http_code}" -o /tmp/github_response.json \
+        -X POST \
+        -H "Authorization: token ${GITHUB_TOKEN}" \
+        -H "Accept: application/vnd.github.v3+json" \
+        -H "Content-Type: application/json" \
+        -d @/tmp/release_payload.json \
+        "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases")
+    
+    if [ "$response" == "201" ]; then
+        log_info "Release 创建成功"
+    else
+        log_warn "Release 创建可能失败，HTTP 状态码: $response"
+        if [ -f /tmp/github_response.json ]; then
+            log_warn "响应内容: $(cat /tmp/github_response.json)"
+        fi
+    fi
+    
+    # 清理临时文件
+    rm -f /tmp/release_payload.json
+}
+
 # 主函数
 main() {
     log_info "=== 开始同步流程 ==="
@@ -154,6 +232,12 @@ main() {
     
     # 同步代码
     sync_code
+    
+    # 更新 Pull Log
+    update_pull_log
+    
+    # 创建 Release
+    create_release
     
     log_info "=== 同步流程完成 ==="
 }

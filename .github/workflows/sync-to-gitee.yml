@@ -22,53 +22,6 @@ jobs:
         env:
           GITEE_USERNAME: ${{ secrets.GITEE_USERNAME }}
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
-
-      - name: Update Pull Log
-        if: success()
-        run: |
-          # 获取当前时间
-          CURRENT_DATE=$(date '+%Y-%m-%d %H:%M:%S')
-          RUN_NUMBER="${{ github.run_number }}"
-          
-          # 读取现有日志
-          if [ -f UPDATE_LOG.md ]; then
-            # 在表格末尾添加新行
-            sed -i "3a| ${CURRENT_DATE} | 同步 #${RUN_NUMBER} | 自动同步 hermes-agent 到 Gitee |" UPDATE_LOG.md
-          else
-            # 创建新日志文件
-            echo "# 拉取同步日志" > UPDATE_LOG.md
-            echo "" >> UPDATE_LOG.md
-            echo "| Date | Version | Changes |" >> UPDATE_LOG.md
-            echo "|------|---------|---------|" >> UPDATE_LOG.md
-            echo "| ${CURRENT_DATE} | 同步 #${RUN_NUMBER} | 自动同步 hermes-agent 到 Gitee |" >> UPDATE_LOG.md
-          fi
-          
-          # 提交日志更新
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add UPDATE_LOG.md
-          git commit -m "docs: 更新拉取日志 - 同步 #${RUN_NUMBER}" || echo "无更新"
-          git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create or Update Release
-        if: success()
-        uses: softprops/action-gh-release@v2
-        with:
-          name: "hermes-agent 镜像同步"
-          tag_name: sync-${{ github.run_number }}
-          draft: false
-          prerelease: false
-          body: |
-            ## Hermes Agent 自动同步
-
-            自动从 GitHub (NousResearch/hermes-agent) 同步到 Gitee 镜像仓库。
-            
-            **同步时间**: ${{ github.event.head_commit.timestamp || github.run_started_at }}
-            **同步方式**: 完整镜像同步（包含所有分支和标签）
-            
-            ### 配置说明
-            - 同步频率：每6小时自动同步
-            - 支持手动触发：通过 GitHub Actions 页面手动运行
-            - 镜像仓库：Gitee 对应仓库
+          GITHUB_TOKEN: ${{ github.token }}
+          RUN_NUMBER: ${{ github.run_number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
