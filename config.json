@@ -1,0 +1,14 @@
+{
+  "source": {
+    "repo": "NousResearch/hermes-agent",
+    "branch": "main"
+  },
+  "target": {
+    "repo": "hermes-agent"
+  },
+  "sync": {
+    "frequency": "daily",
+    "create_release": true,
+    "update_log": true
+  }
+}
