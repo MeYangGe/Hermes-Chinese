@@ -45,6 +45,11 @@ check_env_vars() {
         exit 1
     fi
     
+    if [ -z "$GITHUB_REPOSITORY" ]; then
+        log_error "GITHUB_REPOSITORY 环境变量未设置"
+        exit 1
+    fi
+    
     log_info "环境变量检查通过"
 }
 
@@ -130,17 +135,30 @@ sync_code() {
     fi
     
     log_info "克隆源仓库: ${source_repo}"
-    git clone --mirror "${source_repo}" hermes-agent-mirror
+    git clone --mirror --progress "${source_repo}" hermes-agent-mirror 2>&1 | while read -r line; do
+        log_info "[克隆进度] $line"
+    done
     
     cd hermes-agent-mirror
+    
+    # 显示仓库信息
+    log_info "仓库信息:"
+    log_info "  分支数: $(git branch -a | wc -l)"
+    log_info "  标签数: $(git tag | wc -l)"
+    log_info "  提交数: $(git rev-list --all --count)"
+    log_info "  仓库大小: $(git count-objects -vH | grep 'size-pack' | awk '{print $2}')"
     
     # 添加目标仓库远程地址
     log_info "配置目标仓库: ${GITEE_USERNAME}/hermes-agent"
     git remote add gitee "${target_repo}" 2>/dev/null || git remote set-url gitee "${target_repo}"
     
     # 推送代码
-    log_info "推送代码到 Gitee..."
-    git push gitee --mirror
+    log_info "推送代码到 Gitee (这可能需要几分钟，请耐心等待)..."
+    log_info "提示：如果长时间无响应，可能是网络问题，请稍后重试"
+    
+    git push gitee --mirror --progress 2>&1 | while read -r line; do
+        log_info "[推送进度] $line"
+    done
     
     cd ..
     
@@ -230,16 +248,19 @@ main() {
         create_repo "${GITEE_USERNAME}" "hermes-agent"
     fi
     
-    # 同步代码
-    sync_code
-    
-    # 更新 Pull Log
-    update_pull_log
-    
-    # 创建 Release
-    create_release
-    
-    log_info "=== 同步流程完成 ==="
+    # 同步代码，并仅在成功时执行后续操作
+    if sync_code; then
+        # 更新 Pull Log
+        update_pull_log
+        
+        # 创建 Release
+        create_release
+        
+        log_info "=== 同步流程完成 ==="
+    else
+        log_error "=== 同步流程失败 ==="
+        exit 1
+    fi
 }
 
 # 执行主函数
