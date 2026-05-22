@@ -128,18 +128,26 @@ sync_code() {
     
     log_info "开始同步代码..."
     
-    # 克隆源仓库
+    # 检查镜像目录是否存在
     if [ -d "hermes-agent-mirror" ]; then
-        log_warn "清理旧的镜像目录..."
-        rm -rf hermes-agent-mirror
+        log_info "发现已存在的镜像目录，直接拉取更新..."
+        cd hermes-agent-mirror
+        
+        # 确保远程源仓库地址正确
+        git remote set-url origin "${source_repo}"
+        
+        # 拉取最新更新
+        log_info "从源仓库拉取最新更新..."
+        git remote update --prune 2>&1 | while read -r line; do
+            log_info "[拉取进度] $line"
+        done
+    else
+        log_info "镜像目录不存在，克隆源仓库: ${source_repo}"
+        git clone --mirror --progress "${source_repo}" hermes-agent-mirror 2>&1 | while read -r line; do
+            log_info "[克隆进度] $line"
+        done
+        cd hermes-agent-mirror
     fi
-    
-    log_info "克隆源仓库: ${source_repo}"
-    git clone --mirror --progress "${source_repo}" hermes-agent-mirror 2>&1 | while read -r line; do
-        log_info "[克隆进度] $line"
-    done
-    
-    cd hermes-agent-mirror
     
     # 显示仓库信息
     log_info "仓库信息:"
@@ -148,7 +156,7 @@ sync_code() {
     log_info "  提交数: $(git rev-list --all --count)"
     log_info "  仓库大小: $(git count-objects -vH | grep 'size-pack' | awk '{print $2}')"
     
-    # 添加目标仓库远程地址
+    # 添加/更新目标仓库远程地址
     log_info "配置目标仓库: ${GITEE_USERNAME}/hermes-agent"
     git remote add gitee "${target_repo}" 2>/dev/null || git remote set-url gitee "${target_repo}"
     
