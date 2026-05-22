@@ -327,6 +327,8 @@ main() {
     # 检查并创建仓库（如果需要）
     if ! check_repo_exists "${GITEE_USERNAME}" "${TARGET_REPO}"; then
         create_repo "${GITEE_USERNAME}" "${TARGET_REPO}"
+    else
+        log_info "目标仓库已存在，准备进行镜像同步（将使用 GitHub 内容完全覆盖 Gitee 仓库）"
     fi
     
     # 同步代码
