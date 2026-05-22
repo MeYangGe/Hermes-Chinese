@@ -14,21 +14,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Clone hermes-agent from GitHub
-        run: |
-          git clone --mirror https://github.com/NousResearch/hermes-agent.git hermes-agent-mirror
+      - name: Make script executable
+        run: chmod +x scripts/sync-to-gitee.sh
 
       - name: Sync to Gitee
-        run: |
-          cd hermes-agent-mirror
-          
-          # 设置 Gitee 认证信息（Gitee 需要使用 oauth2 作为 token 用户名）
-          git remote add gitee https://oauth2:${{ secrets.GITEE_TOKEN }}@gitee.com/${{ secrets.GITEE_USERNAME }}/hermes-agent.git
-          
-          # 推送所有分支和标签
-          git push gitee --mirror
-          
-          echo "同步完成！"
+        run: scripts/sync-to-gitee.sh
         env:
           GITEE_USERNAME: ${{ secrets.GITEE_USERNAME }}
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
